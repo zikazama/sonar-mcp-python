@@ -1,0 +1,23 @@
+services:
+  sonarqube-mcp:
+    build: .
+    environment:
+      - SONARQUBE_URL=${SONARQUBE_URL:-http://host.docker.internal:8088}
+      - SONARQUBE_TOKEN=${SONARQUBE_TOKEN}
+      - SONARQUBE_USERNAME=${SONARQUBE_USERNAME}
+      - SONARQUBE_PASSWORD=${SONARQUBE_PASSWORD}
+      - ENVIRONMENT=production
+    env_file:
+      - .env.docker
+    volumes:
+      - .:/app
+    stdin_open: true
+    tty: true
+    networks:
+      - mcp-network
+    command: ["python", "mcp_server.py"]
+    restart: unless-stopped
+
+networks:
+  mcp-network:
+    driver: bridge

@@ -1,0 +1,15 @@
+{
+  "name": "SonarQube MCP",
+  "description": "SonarQube FastAPI MCP Server for Qwen",
+  "command": "docker-compose",
+  "args": [
+    "-f",
+    "docker-compose.mcp.yml",
+    "exec",
+    "-T",
+    "sonarqube-mcp",
+    "python",
+    "mcp_server.py"
+  ],
+  "workingDirectory": "H:\\fauzi\\project\\sonarqube-fastapi-mcp"
+}

@@ -1,0 +1,9 @@
+services:
+  sonarqube-mcp:
+    # Development overrides
+    environment:
+      - ENVIRONMENT=development
+    volumes:
+      - ./logs:/app/logs
+    # For development, you might want to override the command to run in debug mode
+    # command: ["python", "-u", "mcp_server.py"]

@@ -1,0 +1,15 @@
+{
+  "name": "sonarqube-mcp",
+  "description": "SonarQube FastAPI MCP Server for Qwen",
+  "commands": [
+    "get_all_projects",
+    "get_coverage_metrics",
+    "get_overall_coverage",
+    "get_new_code_coverage",
+    "get_duplication_rate",
+    "get_uncovered_lines",
+    "get_project_issues",
+    "health_check"
+  ],
+  "entrypoint": "python mcp_server.py"
+}

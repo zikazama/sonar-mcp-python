@@ -1,0 +1,139 @@
+{
+  "name": "sonarqube-mcp",
+  "description": "SonarQube FastAPI MCP Server for Claude, Qwen, and Cursor",
+  "commands": [
+    {
+      "name": "get_all_projects",
+      "description": "Get all projects from SonarQube",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "Page number (default: 1)",
+            "minimum": 1
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "Number of projects per page (default: 100, max: 500)",
+            "minimum": 1,
+            "maximum": 500
+          }
+        }
+      }
+    },
+    {
+      "name": "get_coverage_metrics",
+      "description": "Get all coverage metrics for a SonarQube component",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "component_key": {
+            "type": "string",
+            "description": "The SonarQube component key"
+          }
+        },
+        "required": ["component_key"]
+      }
+    },
+    {
+      "name": "get_overall_coverage",
+      "description": "Get overall coverage for a SonarQube component",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "component_key": {
+            "type": "string",
+            "description": "The SonarQube component key"
+          }
+        },
+        "required": ["component_key"]
+      }
+    },
+    {
+      "name": "get_new_code_coverage",
+      "description": "Get new code coverage for a SonarQube component",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "component_key": {
+            "type": "string",
+            "description": "The SonarQube component key"
+          }
+        },
+        "required": ["component_key"]
+      }
+    },
+    {
+      "name": "get_duplication_rate",
+      "description": "Get duplication rate for a SonarQube component",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "component_key": {
+            "type": "string",
+            "description": "The SonarQube component key"
+          }
+        },
+        "required": ["component_key"]
+      }
+    },
+    {
+      "name": "get_uncovered_lines",
+      "description": "Get uncovered lines for a SonarQube component",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "component_key": {
+            "type": "string",
+            "description": "The SonarQube component key"
+          }
+        },
+        "required": ["component_key"]
+      }
+    },
+    {
+      "name": "get_project_issues",
+      "description": "Get issues for a SonarQube component",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "component_key": {
+            "type": "string",
+            "description": "The SonarQube component key"
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Issue types to filter (CODE_SMELL, BUG, VULNERABILITY, SECURITY_HOTSPOT)"
+          },
+          "severities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Severities to filter (INFO, MINOR, MAJOR, CRITICAL, BLOCKER)"
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Statuses to filter (OPEN, CONFIRMED, REOPENED, RESOLVED, CLOSED)"
+          }
+        },
+        "required": ["component_key"]
+      }
+    },
+    {
+      "name": "health_check",
+      "description": "Check if the SonarQube MCP server is healthy",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  ]
+}

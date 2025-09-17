@@ -45,6 +45,28 @@ The project includes multiple Docker Compose configurations:
    docker-compose -f docker-compose.mcp.yml down
    ```
 
+## MCP Configuration
+
+To use this server with AI tools like Qwen, Cursor, or Claude, configure the MCP settings as follows:
+
+```json
+{
+  "sonarqube-mcp": {
+    "command": "docker-compose",
+    "args": [
+      "-f",
+      "docker-compose.mcp.yml",
+      "exec",
+      "-T",
+      "sonarqube-mcp",
+      "python",
+      "mcp_server.py"
+    ],
+    "cwd": "H:\\fauzi\\project\\sonarqube-fastapi-mcp"
+  }
+}
+```
+
 ## Usage
 
-The server implements MCP protocol and can be used with compatible AI tools like Qwen, Cursor, and Claude.# sonar-mcp-python
+The server implements MCP protocol and can be used with compatible AI tools like Qwen, Cursor, and Claude.

@@ -18,6 +18,7 @@ from sonarqube_service import SonarQubeService
 
 async def get_uncovered_lines():
     """Get uncovered lines for the Jatis Coster Contact Import project"""
+    service = None
     try:
         # Get configuration from environment
         sonarqube_url = os.getenv("SONARQUBE_URL", "http://localhost:8088")
@@ -65,6 +66,10 @@ async def get_uncovered_lines():
         print(f"Error: {e}")
         import traceback
         traceback.print_exc()
+    finally:
+        # Clean up resources
+        if service:
+            await service.close()
 
 if __name__ == "__main__":
     asyncio.run(get_uncovered_lines())

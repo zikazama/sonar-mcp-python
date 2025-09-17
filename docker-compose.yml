@@ -14,6 +14,9 @@ services:
     tty: true
     networks:
       - mcp-network
+    # Add extra hosts to ensure host.docker.internal works
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 networks:
   mcp-network:

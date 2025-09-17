@@ -1,8 +1,12 @@
 from fastapi import HTTPException
 import httpx
 import os
+import logging
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 class SonarQubeMeasure(BaseModel):
     metric: str
@@ -49,7 +53,19 @@ class SonarQubeService:
         self.token = token
         self.username = username
         self.password = password
-        self.client = httpx.AsyncClient()
+        
+        # Create HTTP client with connection pooling and optimized settings
+        self.client = httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0),
+            limits=httpx.Limits(
+                max_connections=20,
+                max_keepalive_connections=5,
+                keepalive_expiry=30.0
+            ),
+            follow_redirects=True
+        )
+        
+        logger.info(f"SonarQubeService initialized with URL: {self.base_url}")
         
     async def get_component_measures(
         self, 
@@ -91,19 +107,21 @@ class SonarQubeService:
             auth = (self.username, self.password)
             
         try:
+            logger.debug(f"Making request to SonarQube API: {url} with params: {params}")
             response = await self.client.get(
                 url, 
                 params=params, 
-                auth=auth,
-                timeout=30.0
+                auth=auth
             )
             
             # Raise an exception for bad status codes
             response.raise_for_status()
             
+            logger.debug(f"Successfully retrieved measures for component: {component_key}")
             return response.json()
             
         except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error {e.response.status_code} when fetching measures for {component_key}: {e.response.text}")
             if e.response.status_code == 404:
                 raise HTTPException(
                     status_code=404,
@@ -120,11 +138,13 @@ class SonarQubeService:
                     detail=f"SonarQube API error: {e.response.text}"
                 )
         except httpx.RequestError as e:
+            logger.error(f"Network error when connecting to SonarQube for component {component_key}: {str(e)}")
             raise HTTPException(
                 status_code=503,
                 detail=f"Error connecting to SonarQube: {str(e)}"
             )
         except Exception as e:
+            logger.error(f"Unexpected error when fetching measures for component {component_key}: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Unexpected error: {str(e)}"
@@ -155,27 +175,31 @@ class SonarQubeService:
             auth = (self.username, self.password)
             
         try:
+            logger.debug(f"Making request to SonarQube API: {url} with params: {params}")
             response = await self.client.get(
                 url,
                 params=params,
-                auth=auth,
-                timeout=30.0
+                auth=auth
             )
             
             response.raise_for_status()
+            logger.debug("Successfully retrieved projects list")
             return response.json()
             
         except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error {e.response.status_code} when fetching projects: {e.response.text}")
             raise HTTPException(
                 status_code=e.response.status_code,
                 detail=f"SonarQube API error: {e.response.text}"
             )
         except httpx.RequestError as e:
+            logger.error(f"Network error when connecting to SonarQube for projects: {str(e)}")
             raise HTTPException(
                 status_code=503,
                 detail=f"Error connecting to SonarQube: {str(e)}"
             )
         except Exception as e:
+            logger.error(f"Unexpected error when fetching projects: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Unexpected error: {str(e)}"
@@ -194,6 +218,7 @@ class SonarQubeService:
         ]
         
         try:
+            logger.debug(f"Fetching coverage metrics for component: {component_key}")
             # Get the measures from SonarQube
             data = await self.get_component_measures(component_key, coverage_metrics)
             
@@ -209,7 +234,7 @@ class SonarQubeService:
                     metrics_dict[metric_key] = metric_value
             
             # Create response with the specific metrics
-            return CoverageMetricsResponse(
+            result = CoverageMetricsResponse(
                 overall_coverage=metrics_dict.get("coverage"),
                 new_code_coverage=metrics_dict.get("new_coverage"),
                 duplication_rate=metrics_dict.get("duplicated_lines_density"),
@@ -218,9 +243,11 @@ class SonarQubeService:
                 component_name=data.get("component", {}).get("name", "")
             )
             
+            logger.debug(f"Successfully retrieved coverage metrics for component: {component_key}")
+            return result
+            
         except Exception as e:
-            # Log the actual error for debugging
-            print(f"Error retrieving coverage metrics for {component_key}: {str(e)}")
+            logger.error(f"Error retrieving coverage metrics for {component_key}: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Error retrieving coverage metrics: {str(e)}"
@@ -231,6 +258,7 @@ class SonarQubeService:
         Get a single metric for a component
         """
         try:
+            logger.debug(f"Fetching metric '{metric_key}' for component: {component_key}")
             # Get the measure from SonarQube
             data = await self.get_component_measures(component_key, [metric_key])
             
@@ -241,14 +269,18 @@ class SonarQubeService:
                 value = measures[0]["value"]
             
             # Create response with the metric
-            return SingleMetricResponse(
+            result = SingleMetricResponse(
                 component_key=data.get("component", {}).get("key", ""),
                 component_name=data.get("component", {}).get("name", ""),
                 metric=metric_key,
                 value=value
             )
             
+            logger.debug(f"Successfully retrieved metric '{metric_key}' for component: {component_key}")
+            return result
+            
         except Exception as e:
+            logger.error(f"Error retrieving metric '{metric_key}' for component {component_key}: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Error retrieving metric '{metric_key}': {str(e)}"
@@ -292,26 +324,30 @@ class SonarQubeService:
             auth = (self.username, self.password)
             
         try:
+            logger.debug(f"Making request to SonarQube API: {url}")
             response = await self.client.get(
                 url,
-                auth=auth,
-                timeout=30.0
+                auth=auth
             )
             
             response.raise_for_status()
+            logger.debug("Successfully retrieved available metrics")
             return response.json()
             
         except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error {e.response.status_code} when fetching metrics: {e.response.text}")
             raise HTTPException(
                 status_code=e.response.status_code,
                 detail=f"SonarQube API error: {e.response.text}"
             )
         except httpx.RequestError as e:
+            logger.error(f"Network error when connecting to SonarQube for metrics: {str(e)}")
             raise HTTPException(
                 status_code=503,
                 detail=f"Error connecting to SonarQube: {str(e)}"
             )
         except Exception as e:
+            logger.error(f"Unexpected error when fetching metrics: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Unexpected error: {str(e)}"
@@ -319,7 +355,9 @@ class SonarQubeService:
     
     async def close(self):
         """Close the HTTP client"""
-        await self.client.aclose()
+        if self.client:
+            await self.client.aclose()
+            logger.info("SonarQubeService HTTP client closed")
         
     async def get_issues(self, component_key: str, types: List[str] = None, severities: List[str] = None, statuses: List[str] = None) -> Dict[str, Any]:
         """
@@ -354,19 +392,21 @@ class SonarQubeService:
             auth = (self.username, self.password)
             
         try:
+            logger.debug(f"Making request to SonarQube API: {url} with params: {params}")
             response = await self.client.get(
                 url,
                 params=params,
-                auth=auth,
-                timeout=30.0
+                auth=auth
             )
             
             # Raise an exception for bad status codes
             response.raise_for_status()
             
+            logger.debug(f"Successfully retrieved issues for component: {component_key}")
             return response.json()
             
         except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error {e.response.status_code} when fetching issues for {component_key}: {e.response.text}")
             if e.response.status_code == 404:
                 raise HTTPException(
                     status_code=404,
@@ -383,11 +423,13 @@ class SonarQubeService:
                     detail=f"SonarQube API error: {e.response.text}"
                 )
         except httpx.RequestError as e:
+            logger.error(f"Network error when connecting to SonarQube for issues {component_key}: {str(e)}")
             raise HTTPException(
                 status_code=503,
                 detail=f"Error connecting to SonarQube: {str(e)}"
             )
         except Exception as e:
+            logger.error(f"Unexpected error when fetching issues for component {component_key}: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Unexpected error: {str(e)}"

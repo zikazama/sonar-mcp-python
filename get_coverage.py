@@ -13,6 +13,7 @@ from sonarqube_service import SonarQubeService
 
 async def get_project_coverage(project_key, project_name):
     """Get coverage metrics for a specific project"""
+    service = None
     try:
         # Get configuration from environment
         sonarqube_url = os.getenv("SONARQUBE_URL", "http://localhost:8088")
@@ -47,6 +48,10 @@ async def get_project_coverage(project_key, project_name):
         print(f"Error: {e}")
         import traceback
         traceback.print_exc()
+    finally:
+        # Clean up resources
+        if service:
+            await service.close()
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:

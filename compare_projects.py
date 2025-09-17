@@ -18,6 +18,7 @@ from sonarqube_service import SonarQubeService
 
 async def compare_projects(project1_key, project1_name, project2_key, project2_name):
     """Compare two projects side by side"""
+    service = None
     try:
         # Get configuration from environment
         sonarqube_url = os.getenv("SONARQUBE_URL", "http://localhost:8088")
@@ -84,6 +85,10 @@ async def compare_projects(project1_key, project1_name, project2_key, project2_n
         print(f"Error: {e}")
         import traceback
         traceback.print_exc()
+    finally:
+        # Clean up resources
+        if service:
+            await service.close()
 
 if __name__ == "__main__":
     if len(sys.argv) != 5:

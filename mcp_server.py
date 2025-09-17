@@ -12,6 +12,7 @@ from typing import Dict, Any, List, Optional
 from sonarqube_service import SonarQubeService
 import os
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 
 # Load environment variables
 load_dotenv()
@@ -30,14 +31,28 @@ class SonarQubeMCP:
         self.sonarqube_token = os.getenv("SONARQUBE_TOKEN", "")
         self.sonarqube_username = os.getenv("SONARQUBE_USERNAME", "")
         self.sonarqube_password = os.getenv("SONARQUBE_PASSWORD", "")
-        self.service = SonarQubeService(
-            self.sonarqube_url,
-            self.sonarqube_token,
-            self.sonarqube_username,
-            self.sonarqube_password
-        )
+        self.service = None
         logger.info(f"SonarQubeMCP initialized with URL: {self.sonarqube_url}")
         
+    async def initialize_service(self):
+        """Initialize the SonarQube service with connection pooling"""
+        if self.service is None:
+            self.service = SonarQubeService(
+                self.sonarqube_url,
+                self.sonarqube_token,
+                self.sonarqube_username,
+                self.sonarqube_password
+            )
+            logger.info("SonarQubeService initialized")
+        return self.service
+        
+    async def close_service(self):
+        """Close the SonarQube service connection"""
+        if self.service:
+            await self.service.close()
+            self.service = None
+            logger.info("SonarQubeService closed")
+
     async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Handle MCP requests"""
         try:
@@ -45,6 +60,9 @@ class SonarQubeMCP:
             params = request.get("params", {})
             
             logger.info(f"Handling request: {method} with params: {params}")
+            
+            # Initialize service if needed
+            await self.initialize_service()
             
             if method == "initialize":
                 logger.info("Initialize request received")
@@ -220,7 +238,8 @@ class SonarQubeMCP:
                     logger.info(f"Fetching projects - page: {page}, page_size: {page_size}")
                     try:
                         result = await self.service.get_projects(page, page_size)
-                        logger.info(f"Successfully fetched projects: {len(result.get('components', []))} projects found")
+                        projects_count = len(result.get('components', []))
+                        logger.info(f"Successfully fetched projects: {projects_count} projects found")
                         return {
                             "result": {
                                 "content": [
@@ -233,11 +252,20 @@ class SonarQubeMCP:
                         }
                     except Exception as e:
                         logger.error(f"Error fetching projects: {str(e)}", exc_info=True)
+                        # Provide more detailed error information
+                        error_data = {
+                            "error_type": type(e).__name__,
+                            "error_message": str(e),
+                            "page": page,
+                            "page_size": page_size
+                        }
+                        if hasattr(e, '__dict__'):
+                            error_data["error_details"] = e.__dict__
                         return {
                             "error": {
                                 "code": -32603,
                                 "message": "Internal error",
-                                "data": str(e)
+                                "data": error_data
                             }
                         }
                     
@@ -254,18 +282,29 @@ class SonarQubeMCP:
                         }
                     
                     logger.info(f"Fetching coverage metrics for component: {component_key}")
-                    result = await self.service.get_coverage_metrics(component_key)
-                    return {
-                        "result": {
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": json.dumps(result.dict(), indent=2)
-                                }
-                            ]
+                    try:
+                        result = await self.service.get_coverage_metrics(component_key)
+                        logger.info(f"Successfully fetched coverage metrics for component: {component_key}")
+                        return {
+                            "result": {
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": json.dumps(result.dict(), indent=2)
+                                    }
+                                ]
+                            }
                         }
-                    }
-                    
+                    except Exception as e:
+                        logger.error(f"Error fetching coverage metrics: {str(e)}", exc_info=True)
+                        return {
+                            "error": {
+                                "code": -32603,
+                                "message": "Internal error",
+                                "data": str(e)
+                            }
+                        }
+                        
                 elif tool_name == "get_overall_coverage":
                     component_key = tool_args.get("component_key")
                     if not component_key:
@@ -279,18 +318,29 @@ class SonarQubeMCP:
                         }
                     
                     logger.info(f"Fetching overall coverage for component: {component_key}")
-                    result = await self.service.get_overall_coverage(component_key)
-                    return {
-                        "result": {
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": json.dumps(result.dict(), indent=2)
-                                }
-                            ]
+                    try:
+                        result = await self.service.get_overall_coverage(component_key)
+                        logger.info(f"Successfully fetched overall coverage for component: {component_key}")
+                        return {
+                            "result": {
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": json.dumps(result.dict(), indent=2)
+                                    }
+                                ]
+                            }
                         }
-                    }
-                    
+                    except Exception as e:
+                        logger.error(f"Error fetching overall coverage: {str(e)}", exc_info=True)
+                        return {
+                            "error": {
+                                "code": -32603,
+                                "message": "Internal error",
+                                "data": str(e)
+                            }
+                        }
+                        
                 elif tool_name == "get_new_code_coverage":
                     component_key = tool_args.get("component_key")
                     if not component_key:
@@ -304,18 +354,29 @@ class SonarQubeMCP:
                         }
                     
                     logger.info(f"Fetching new code coverage for component: {component_key}")
-                    result = await self.service.get_new_code_coverage(component_key)
-                    return {
-                        "result": {
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": json.dumps(result.dict(), indent=2)
-                                }
-                            ]
+                    try:
+                        result = await self.service.get_new_code_coverage(component_key)
+                        logger.info(f"Successfully fetched new code coverage for component: {component_key}")
+                        return {
+                            "result": {
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": json.dumps(result.dict(), indent=2)
+                                    }
+                                ]
+                            }
                         }
-                    }
-                    
+                    except Exception as e:
+                        logger.error(f"Error fetching new code coverage: {str(e)}", exc_info=True)
+                        return {
+                            "error": {
+                                "code": -32603,
+                                "message": "Internal error",
+                                "data": str(e)
+                            }
+                        }
+                        
                 elif tool_name == "get_duplication_rate":
                     component_key = tool_args.get("component_key")
                     if not component_key:
@@ -329,18 +390,29 @@ class SonarQubeMCP:
                         }
                     
                     logger.info(f"Fetching duplication rate for component: {component_key}")
-                    result = await self.service.get_duplication_rate(component_key)
-                    return {
-                        "result": {
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": json.dumps(result.dict(), indent=2)
-                                }
-                            ]
+                    try:
+                        result = await self.service.get_duplication_rate(component_key)
+                        logger.info(f"Successfully fetched duplication rate for component: {component_key}")
+                        return {
+                            "result": {
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": json.dumps(result.dict(), indent=2)
+                                    }
+                                ]
+                            }
                         }
-                    }
-                    
+                    except Exception as e:
+                        logger.error(f"Error fetching duplication rate: {str(e)}", exc_info=True)
+                        return {
+                            "error": {
+                                "code": -32603,
+                                "message": "Internal error",
+                                "data": str(e)
+                            }
+                        }
+                        
                 elif tool_name == "get_uncovered_lines":
                     component_key = tool_args.get("component_key")
                     if not component_key:
@@ -354,18 +426,29 @@ class SonarQubeMCP:
                         }
                     
                     logger.info(f"Fetching uncovered lines for component: {component_key}")
-                    result = await self.service.get_uncovered_lines(component_key)
-                    return {
-                        "result": {
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": json.dumps(result.dict(), indent=2)
-                                }
-                            ]
+                    try:
+                        result = await self.service.get_uncovered_lines(component_key)
+                        logger.info(f"Successfully fetched uncovered lines for component: {component_key}")
+                        return {
+                            "result": {
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": json.dumps(result.dict(), indent=2)
+                                    }
+                                ]
+                            }
                         }
-                    }
-                    
+                    except Exception as e:
+                        logger.error(f"Error fetching uncovered lines: {str(e)}", exc_info=True)
+                        return {
+                            "error": {
+                                "code": -32603,
+                                "message": "Internal error",
+                                "data": str(e)
+                            }
+                        }
+                        
                 elif tool_name == "get_project_issues":
                     component_key = tool_args.get("component_key")
                     if not component_key:
@@ -383,21 +466,51 @@ class SonarQubeMCP:
                     statuses = tool_args.get("statuses", [])
                     
                     logger.info(f"Fetching issues for component: {component_key}")
-                    result = await self.service.get_issues(component_key, types, severities, statuses)
-                    return {
-                        "result": {
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": json.dumps(result, indent=2)
-                                }
-                            ]
+                    try:
+                        result = await self.service.get_issues(component_key, types, severities, statuses)
+                        issues_count = result.get('total', 0)
+                        logger.info(f"Successfully fetched issues for component: {component_key} ({issues_count} issues)")
+                        return {
+                            "result": {
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": json.dumps(result, indent=2)
+                                    }
+                                ]
+                            }
                         }
-                    }
-                    
+                    except Exception as e:
+                        logger.error(f"Error fetching issues: {str(e)}", exc_info=True)
+                        return {
+                            "error": {
+                                "code": -32603,
+                                "message": "Internal error",
+                                "data": str(e)
+                            }
+                        }
+                        
                 elif tool_name == "health_check":
                     logger.info("Health check requested")
-                    health_data = {"status": "healthy", "message": "SonarQube MCP server is running", "url": self.sonarqube_url}
+                    try:
+                        # Test SonarQube connection
+                        test_result = await self.service.get_projects(page=1, page_size=1)
+                        projects_count = test_result.get('paging', {}).get('total', 0)
+                        health_data = {
+                            "status": "healthy", 
+                            "message": "SonarQube MCP server is running and connected to SonarQube",
+                            "url": self.sonarqube_url,
+                            "projects_count": projects_count
+                        }
+                        logger.info(f"Health check successful: {projects_count} projects found")
+                    except Exception as e:
+                        health_data = {
+                            "status": "unhealthy", 
+                            "message": "SonarQube MCP server is running but cannot connect to SonarQube",
+                            "url": self.sonarqube_url,
+                            "error": str(e)
+                        }
+                        logger.error(f"Health check failed: {str(e)}", exc_info=True)
                     return {
                         "result": {
                             "content": [
@@ -450,66 +563,74 @@ class SonarQubeMCP:
         # This is a placeholder for future functionality
         pass
 
+@asynccontextmanager
+async def mcp_server_context():
+    """Context manager for proper resource management"""
+    mcp = SonarQubeMCP()
+    try:
+        yield mcp
+    finally:
+        await mcp.close_service()
+
 async def main():
     """Main MCP server loop"""
-    mcp = SonarQubeMCP()
-    
-    logger.info("Starting SonarQube MCP server")
-    
-    # Handle MCP protocol
-    while True:
-        try:
-            line = await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
-            if not line:
-                break
+    async with mcp_server_context() as mcp:
+        logger.info("Starting SonarQube MCP server")
+        
+        # Handle MCP protocol
+        while True:
+            try:
+                line = await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
+                if not line:
+                    break
+                    
+                request = json.loads(line.strip())
                 
-            request = json.loads(line.strip())
-            
-            # Check if this is a notification (no id) or a request (has id)
-            if "id" in request:
-                # Handle as request (expecting response)
-                response = await mcp.handle_request(request)
-                
-                # Add the jsonrpc version and request ID to the response
-                response["jsonrpc"] = "2.0"
-                response["id"] = request["id"]
-                
-                # Write response to stdout
+                # Check if this is a notification (no id) or a request (has id)
+                if "id" in request:
+                    # Handle as request (expecting response)
+                    response = await mcp.handle_request(request)
+                    
+                    # Add the jsonrpc version and request ID to the response
+                    response["jsonrpc"] = "2.0"
+                    response["id"] = request["id"]
+                    
+                    # Write response to stdout
+                    sys.stdout.write(json.dumps(response) + "\n")
+                    sys.stdout.flush()
+                else:
+                    # Handle as notification (no response expected)
+                    await mcp.handle_notification(request)
+                    
+            except json.JSONDecodeError as e:
+                # Handle invalid JSON
+                logger.error(f"Invalid JSON received: {e}")
+                response = {
+                    "jsonrpc": "2.0",
+                    "id": None,
+                    "error": {
+                        "code": -32700,
+                        "message": "Parse error"
+                    }
+                }
                 sys.stdout.write(json.dumps(response) + "\n")
                 sys.stdout.flush()
-            else:
-                # Handle as notification (no response expected)
-                await mcp.handle_notification(request)
-                
-        except json.JSONDecodeError as e:
-            # Handle invalid JSON
-            logger.error(f"Invalid JSON received: {e}")
-            response = {
-                "jsonrpc": "2.0",
-                "id": None,
-                "error": {
-                    "code": -32700,
-                    "message": "Parse error"
+            except KeyboardInterrupt:
+                logger.info("Received keyboard interrupt, shutting down")
+                break
+            except Exception as e:
+                logger.error(f"Error in main loop: {str(e)}", exc_info=True)
+                response = {
+                    "jsonrpc": "2.0",
+                    "id": request.get("id") if "request" in locals() else None,
+                    "error": {
+                        "code": -32603,
+                        "message": "Internal error",
+                        "data": str(e)
+                    }
                 }
-            }
-            sys.stdout.write(json.dumps(response) + "\n")
-            sys.stdout.flush()
-        except KeyboardInterrupt:
-            logger.info("Received keyboard interrupt, shutting down")
-            break
-        except Exception as e:
-            logger.error(f"Error in main loop: {str(e)}", exc_info=True)
-            response = {
-                "jsonrpc": "2.0",
-                "id": request.get("id") if "request" in locals() else None,
-                "error": {
-                    "code": -32603,
-                    "message": "Internal error",
-                    "data": str(e)
-                }
-            }
-            sys.stdout.write(json.dumps(response) + "\n")
-            sys.stdout.flush()
+                sys.stdout.write(json.dumps(response) + "\n")
+                sys.stdout.flush()
 
 if __name__ == "__main__":
     logger.info("SonarQube MCP server starting...")

@@ -2,12 +2,10 @@ services:
   sonarqube-mcp:
     build: .
     environment:
-      - SONARQUBE_URL=${SONARQUBE_URL:-http://host.docker.internal:8088}
-      - SONARQUBE_TOKEN=${SONARQUBE_TOKEN}
-      - SONARQUBE_USERNAME=${SONARQUBE_USERNAME}
-      - SONARQUBE_PASSWORD=${SONARQUBE_PASSWORD}
-    env_file:
-      - .env.docker
+      - SONARQUBE_URL=http://host.docker.internal:8088
+      - SONARQUBE_TOKEN=squ_f5d437fc56b7a7b8f1654a7f3515511d1e16581d
+      - SONARQUBE_USERNAME=admin
+      - SONARQUBE_PASSWORD=admin
     volumes:
       - .:/app
     stdin_open: true
@@ -16,6 +14,9 @@ services:
       - mcp-network
     # Override the default command to run the MCP server
     command: ["python", "mcp_server.py"]
+    # Add extra hosts to ensure host.docker.internal works
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 networks:
   mcp-network:

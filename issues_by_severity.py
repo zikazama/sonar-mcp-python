@@ -18,6 +18,7 @@ from sonarqube_service import SonarQubeService
 
 async def project_issues_by_severity(project_key, project_name):
     """Get detailed issues breakdown by severity for a project"""
+    service = None
     try:
         # Get configuration from environment
         sonarqube_url = os.getenv("SONARQUBE_URL", "http://localhost:8088")
@@ -95,6 +96,10 @@ async def project_issues_by_severity(project_key, project_name):
         print(f"Error: {e}")
         import traceback
         traceback.print_exc()
+    finally:
+        # Clean up resources
+        if service:
+            await service.close()
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:

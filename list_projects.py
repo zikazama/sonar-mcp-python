@@ -15,10 +15,10 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv()
 
 from sonarqube_service import SonarQubeService
-import os
 
 async def list_sonarqube_projects():
     """List all projects in SonarQube"""
+    service = None
     try:
         # Get configuration from environment
         sonarqube_url = os.getenv("SONARQUBE_URL", "http://localhost:8088")
@@ -62,6 +62,10 @@ async def list_sonarqube_projects():
         print(f"Error: {e}")
         import traceback
         traceback.print_exc()
+    finally:
+        # Clean up resources
+        if service:
+            await service.close()
 
 if __name__ == "__main__":
     asyncio.run(list_sonarqube_projects())
